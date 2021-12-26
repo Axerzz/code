@@ -1,0 +1,80 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+
+module memorio(clock,reset,caddress,wdata,memread,memwrite,ioread,iowrite,Instruction_mi,PC_plus_4_in_mi,MulDiv_in,Instruction_wb,PC_plus_4_out_mi,MulDiv_out,rdata,aluresult,rdata_out,aluresult_out,mread_data,ioread_data,write_data,address,LEDCtrl,SwitchCtrl,VGACtrl);
+    //对外输入输出
+    input clock,reset;
+    input[31:0] caddress;       // 从执行单元aluresult流水寄存器来
+    input[31:0] wdata;			// 从执行单元read_data_2_out流水寄存器来
+    input memread;				// read memory, from control32
+    input memwrite;				// write memory, from control32
+    input ioread;				// read IO, from control32
+    input iowrite;				// write IO, from control32
+    input[31:0] Instruction_mi;
+    input[31:0] PC_plus_4_in_mi;
+    input[63:0] MulDiv_in; 
+    
+    output[31:0] Instruction_wb;     //                                               （流水寄存器）
+    output[31:0] PC_plus_4_out_mi;   //                                               （流水寄存器）
+    output[63:0] MulDiv_out;        //                                                 (流水寄存器）
+    
+    output[31:0] rdata;             //直接给id,exe用的非流水寄存器
+    output[31:0] aluresult;         //直接给id用的非流水寄存器
+    output[31:0] rdata_out;			// 给译码单元写寄存器用                           (流水寄存器）
+    output[31:0] aluresult_out;         //给译码单元写寄存器用                         (流水寄存器）
+    
+    //对内输入输出
+    input[31:0] mread_data;		// data from memory
+    input[15:0] ioread_data;	// data from io
+    
+    output[31:0] write_data;    // data to memory or I/O
+    output[31:0] address;       // address to mAddress
+    output LEDCtrl;				// LED CS
+    output SwitchCtrl;          // Switch CS
+    output VGACtrl;
+    
+    reg[31:0] write_data;
+    wire iorw;
+    wire[31:0] rdata;
+    reg[31:0] rdata_out;
+    reg[31:0] aluresult_out;
+    reg[31:0] Instruction_wb;
+    reg[31:0] PC_plus_4_out_mi;
+    reg[63:0] MulDiv_out;
+    
+    assign  address = caddress;
+    assign  rdata = (memread==1) ? mread_data : {16'h0000,ioread_data[15:0]};
+    assign  iorw = (iowrite||ioread);
+    assign  LEDCtrl = ((iorw==1) && (caddress[31:0] == 32'hFFFFFC60||caddress[31:0] == 32'hFFFFFC62)) ? 1'b1:1'b0;
+    assign  SwitchCtrl = ((iorw==1) && (caddress[31:0] == 32'hFFFFFC70||caddress[31:0] == 32'hFFFFFC72)) ? 1'b1:1'b0;
+    assign  VGACtrl = ((iorw==1) && (caddress[31:0] == 32'hFFFFFC80||caddress[31:0] == 32'hFFFFFC82||caddress[31:0] == 32'hFFFFFC84||caddress[31:0] == 32'hFFFFFC86||caddress[31:0] == 32'hFFFFFC88)) ? 1'b1:1'b0;
+    assign aluresult=caddress;
+    
+    always @* begin
+        if((memwrite==1)||(iowrite==1)) begin
+            write_data = wdata;
+        end else begin
+            write_data = 32'hZZZZZZZZ;
+        end
+    end
+    
+    //五级流水相关
+    always @ (posedge clock) begin
+        if(reset) 
+            begin
+                rdata_out<=0;
+                aluresult_out<=0;
+                Instruction_wb<=0;
+                PC_plus_4_out_mi<=0;
+                MulDiv_out<=0;
+            end
+        else begin
+        rdata_out<=rdata;
+        aluresult_out<=caddress;
+        Instruction_wb<=Instruction_mi;
+        PC_plus_4_out_mi<=PC_plus_4_in_mi;
+        MulDiv_out<=MulDiv_in;
+        end
+    end
+    
+endmodule
