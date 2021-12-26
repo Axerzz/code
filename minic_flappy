@@ -1,0 +1,108 @@
+int bird_y;
+int tube_x[2];
+int dis_queue[10]= {50,80,100,150,70,120,130,60,140,90};
+int dis_point;
+int next_tube; 
+int dis[2];
+int score;
+int jump_input;
+
+void delay()
+{
+	int i=5;
+	while(i>0)
+	{
+		int j=132;
+		while(j>0)
+		{
+			int k=150;
+			while(k>0)
+			   k--;
+			j--; 
+		}
+		i--;
+	}
+} 
+
+void transfer()
+{
+	    $fffffc80=bird_y;
+		$fffffc82=tube_x[0];
+		$fffffc84=tube_x[1];
+		$fffffc86=dis[0];
+		$fffffc88=dis[1];
+}
+
+int main()
+{
+	score=0;
+	next_tube=0;
+	dis_point=0;
+	bird_y=150;
+	tube_x[0]=400;
+	tube_x[1]=750;
+	dis[0]=dis_queue[dis_point];
+	dis_point++;
+	dis[1]=dis_queue[dis_point];
+	dis_point++;
+	while(1)
+	{
+		transfer();
+		if(tube_x[next_tube]>=244&&tube_x[next_tube]<=328)						 
+	    {
+	    	if(bird_y>250-dis[next_tube]&&bird_y<350-dis[next_tube])
+	    	        score++;
+	    	else
+	    	{
+	    		gameover;
+			}
+		}
+		if(tube_x[next_tube]<244)
+		{
+			next_tube=(next_tube+1)%2;
+		}
+		
+		if(tube_x[0]>96)
+		{
+			tube_x[0]-=2;
+			tube_x[1]-=2;
+		}
+		else
+		{
+			tube_x[0]=tube_x[1];
+			tube_x[1]=tube_x[0]+350;
+			next_tube=0;
+			dis[0]=dis[1];
+			dis[1]=dis_queue[dis_point];
+			dis_point=(dis_point+1)%10; 
+		}
+		if(bird_y<453)
+		     bird_y=bird_y+2;
+		else 
+		{
+			gameover;
+		}
+		//循环延时0.2s 
+		delay();
+		
+		if(jump_input)
+		{
+			if(bird_y-4>0) bird_y=bird_y-4;
+			else bird_y=0;
+		}
+	}
+	
+} 
+
+//    parameter top_tube_x = 350;
+//    parameter Tube_width =50;
+//    parameter Tube_height = 250;
+//    parameter bottom_tube_x = 350;
+//    parameter bottom_tube_y =350
+
+
+// fffffc80 bird_y坐标
+// fffffc82 tube1_x坐标
+// fffffc84 tube2_x坐标
+// fffffc86 tube1的dismiss参数
+// fffffc88 tube2的dismiss参数 
