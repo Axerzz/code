@@ -1,0 +1,220 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 2021/12/15 18:08:03
+// Design Name: 
+// Module Name: VGA_test
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module VGA(
+    input vgaclk ,
+    input vgarst , 
+    input [3:0] vgaaddr,
+    input [15:0]data,
+    input vgacs ,  
+    input IOW,
+    output  reg[3:0] r, // VGA红色分量
+    output  reg[3:0] g, // VGA绿色分量
+    output  reg[3:0] b, // VGA蓝色分量
+    output  hs, // VGA行同步信号
+    output  vs  // VGA场同步信号
+    );
+    reg [15:0] bird_y;
+    reg [15:0] tube1_x;
+    reg [15:0] tube2_x;
+    reg [15:0] dismiss1;
+    reg [15:0] dismiss2;
+    
+    	// 显示器可显示区域
+    parameter UP_BOUND = 31;
+    parameter DOWN_BOUND = 510;
+    parameter LEFT_BOUND = 144;
+    parameter RIGHT_BOUND = 788;
+
+    // 屏幕中央的矩形方块
+    parameter bird_start_x = 150;
+    reg [9:0] bird_start_y = 200;
+    //parameter bird_start_y = 250;
+    parameter bird_width =34;
+    parameter bird_height = 24;
+    
+    reg [9:0] tube_x = 350;
+    parameter top_tube_x = 350;
+    parameter Tube_width =50;
+    parameter Tube_height = 250;
+    parameter bottom_tube_x = 350;
+    parameter bottom_tube_y =350;
+    
+    wire pclk;
+    reg [1:0] count;
+    reg [9:0] hcount, vcount;
+    
+    reg [9:0] bird_addr=0;          //小鸟
+    wire [23:0] bird_rgb;
+    
+    reg [16:0] back_addr=0;         //背景
+    wire [23:0] back_rgb;
+    
+    reg [13:0] top_tube_addr=0;     //top上部分管子的像素
+    wire [23:0] top_tube_rgb;
+    
+    reg [13:0] bottom_tube_addr=0;  //bottom下部分管子的像素
+    wire [23:0] bottom_tube_rgb;
+    
+    reg [13:0] top_tube_addr2=0;     //top上部分管子的像素
+    wire [23:0] top_tube_rgb2;
+    
+    reg [13:0] bottom_tube_addr2=0;  //bottom下部分管子的像素
+    wire [23:0] bottom_tube_rgb2;
+  
+    
+    // 获得像素时钟25MHz
+    assign pclk = count[1];
+    always @ (posedge vgaclk or posedge vgarst)
+    begin
+        if (vgarst)
+            count <= 0;
+        else
+            count <= count+1;
+        if(vgarst) begin
+             bird_y=150;
+             tube1_x=400;
+             tube2_x=750;
+             dismiss1=100;
+             dismiss2=50;
+        end
+        else begin
+             if(vgacs==1&&IOW==1) begin
+                     if(vgaaddr==4'b0000)
+                             bird_y = data;
+                     if(vgaaddr==4'b0010)
+                             tube1_x = data; 
+                     if(vgaaddr==4'b0100)
+                             tube2_x = data;
+                     if(vgaaddr==4'b0110)
+                             dismiss1 = data;
+                     if(vgaaddr==4'b1000)
+                             dismiss2 = data;
+              end
+        end      
+    end
+    
+     background b0(pclk,back_addr,back_rgb);
+     bird BI(pclk,bird_addr,bird_rgb);
+     top top_img(pclk,top_tube_addr,top_tube_rgb);
+     bottom bottom_img(pclk,bottom_tube_addr,bottom_tube_rgb);
+     top top_img2(pclk,top_tube_addr2,top_tube_rgb2);
+     bottom bottom_img2(pclk,bottom_tube_addr2,bottom_tube_rgb2);
+    
+    // 列计数与行同步
+    assign hs = (hcount < 96) ? 0 : 1;
+    always @ (posedge pclk or posedge vgarst)
+    begin
+        if (vgarst)
+            hcount <= 0;
+        else if (hcount == 799)
+            hcount <= 0;
+        else
+            hcount <= hcount+1;
+    end
+    
+    // 行计数与场同步
+    assign vs = (vcount < 2) ? 0 : 1;
+    always @ (posedge pclk or posedge vgarst)
+    begin
+        if (vgarst)
+            vcount <= 0;
+        else if (hcount == 799) begin
+            if (vcount == 520)
+                vcount <= 0;
+            else
+                vcount <= vcount+1;
+        end
+        else
+            vcount <= vcount;
+    end
+    
+    // 设置显示信号值
+    always @ (posedge pclk or posedge vgarst)
+    begin
+        if (vgarst) begin
+            r <= 0;
+            g <= 0;
+            b <= 0;
+        end
+        else if (vcount>=UP_BOUND && vcount<=DOWN_BOUND
+                && hcount>=LEFT_BOUND && hcount<=RIGHT_BOUND) begin
+                //小鸟的优先级最高
+                  if((hcount>=LEFT_BOUND+bird_start_x)&&
+                                   (hcount<=LEFT_BOUND+bird_start_x+bird_width)&&
+                                   (vcount>=UP_BOUND+bird_y)&&
+                                   (vcount<=UP_BOUND+bird_y+bird_height)) begin
+                                    bird_addr<=(vcount-UP_BOUND-bird_y)*bird_width+(hcount-LEFT_BOUND-bird_start_x);
+                                    r<=bird_rgb[23:20];
+                                    g<=bird_rgb[15:12];
+                                    b<=bird_rgb[7:4];
+                  end 
+                  else if((hcount>=tube1_x)&&
+                                     (hcount<=tube1_x+Tube_width)&&
+                                     (vcount>=UP_BOUND)&&
+                                     (vcount+dismiss1<=UP_BOUND+Tube_height)) begin
+                                      top_tube_addr<=(vcount-UP_BOUND+dismiss1)*Tube_width+(hcount-LEFT_BOUND-tube1_x);
+                                      r<=top_tube_rgb[23:20];
+                                      g<=top_tube_rgb[15:12];
+                                      b<=top_tube_rgb[7:4];
+                  end //1号管道下部分
+                  else if((hcount>=tube1_x)&&
+                                          (hcount<=tube1_x+Tube_width)&&
+                                          (vcount+dismiss1>=UP_BOUND+bottom_tube_y)&&
+                                          (vcount<=DOWN_BOUND)) begin
+                                      bottom_tube_addr<=(vcount-UP_BOUND-bottom_tube_y+dismiss1)*Tube_width+(hcount-LEFT_BOUND-tube1_x);
+                                      r<=bottom_tube_rgb[23:20];
+                                      g<=bottom_tube_rgb[15:12];
+                                      b<=bottom_tube_rgb[7:4];
+                  end
+                  else if((hcount>=tube2_x)&&
+                                     (hcount<=tube2_x+Tube_width)&&
+                                     (vcount>=UP_BOUND)&&
+                                     (vcount+dismiss2<=UP_BOUND+Tube_height)) begin
+                                      top_tube_addr2<=(vcount-UP_BOUND+dismiss2)*Tube_width+(hcount-LEFT_BOUND-tube2_x);
+                                      r<=top_tube_rgb2[23:20];
+                                      g<=top_tube_rgb2[15:12];
+                                      b<=top_tube_rgb2[7:4];
+                  end //2号管道下部分
+                  else if((hcount>=tube2_x)&&
+                                          (hcount<=tube2_x+Tube_width)&&
+                                          (vcount+dismiss2>=UP_BOUND+bottom_tube_y)&&
+                                          (vcount<=DOWN_BOUND)) begin
+                                      bottom_tube_addr2<=(vcount-UP_BOUND-bottom_tube_y+dismiss2)*Tube_width+(hcount-LEFT_BOUND-tube2_x);
+                                      r<=bottom_tube_rgb2[23:20];
+                                      g<=bottom_tube_rgb2[15:12];
+                                      b<=bottom_tube_rgb2[7:4];
+                  end
+                  else begin
+                        back_addr<=(vcount-UP_BOUND)/2*320+(hcount-LEFT_BOUND)/2;
+                          r<=back_rgb[23:20];
+                         g<=back_rgb[15:12];
+                           b<=back_rgb[7:4];
+                  end
+        end
+        else begin
+            r <= 4'b0000;
+            g <= 4'b0000;
+            b <= 4'b0000;
+        end
+    end
+endmodule
